@@ -1,78 +1,92 @@
 from netaddr import *
+import json
 
-net_list = []
-
-class BlockList:
+class Network:
     def __init__(self):
-        pass
-
-    def block_ip(self):
-        pass
-
-    def block_ip_range(self):
-        pass
-
-    def block_ip_mask(self):
-        pass
-
-    def unblock_ip(self):
-        pass
-
-    def unblock_ip_range(self):
-        pass
-
-class IPList:
-    def __init__(self):
-        pass
-
-    def create_network_list(self):
+        ip_set = IPSet()
+        net_list = []
         with open("file.txt" , "r") as f:
             lines = f.readlines()
             for line in lines:
                 if "/" in line:
-                    net_list.append(IPNetwork(line))
+                    net_list.append(line)
+                    ip_set.add(IPNetwork(line))
+                elif "-" in line:
+                    net_list.append(line)
+                    start_ip , end_ip = line.split("-")
+                    ip_set.add(IPRange(start_ip, end_ip))
                 else:
-                    net_list.append(IPAddress(line))
-            
+                    net_list.append(line)
+                    ip_set.add(IPAddress(line))
+        self.ip_set = ip_set
         self.net_list = net_list
-        return net_list
+        self._index = 0
+    
+    def __iter__(self): 
+        return self
 
+    
+    def __next__(self): 
+        if self._index < len(self.net_list):
+            result = self.net_list[self._index]
+            self._index += 1
+            return result
+        raise StopIteration
 
-    def check_ip_in_net_list(self, ip_address):
-        for entry in self.net_list:
-            if ip_address == entry:
+    
+    def __repr__(self):
+        return "Network List Object"
+        
+
+    def add(self, ip_address):
+        if "/" in ip_address:
+            self.ip_set.add(IPNetwork(ip_address))
+        elif "-" in ip_address:
+            start_ip , end_ip = ip_address.split("-")
+            self.ip_set.add(IPRange(ip_address))
+        else:
+            self.ip_set.add(IPAddress(ip_address))
+
+        self.write_to_file()
+        
+    
+    def remove(self, ip_address):
+        if "/" in ip_address:
+            self.ip_set.remove(IPNetwork(ip_address))
+        elif "-" in ip_address:
+            start_ip , end_ip = ip_address.split("-")
+            self.ip_set.remove(IPRange(ip_address))
+        else:
+            self.ip_set.remove(IPAddress(ip_address))
+        self.write_to_file()
+    
+
+    def check(self, ip_address):
+        if "/" in ip_address:
+            if IPNetwork(ip_address) in self.ip_set:
                 return True
+            else:
+                return False
+        elif "-" in ip_address:
+            start_ip , end_ip = ip_address.split("-")
+            if IPRange(start_ip,end_ip) in self.ip_set:
+                return True
+            else:
+                return False
+        else:
+            if IPAddress(ip_address) in self.ip_set:
+                return {"result" : "f'{ip_address}'"}
+            else:
+                return False
 
-    def check_ip_range_in_list(self, ip_range):
-        pass
-
-    def check_ip_mask_in_list(self,ip_mask):
-        pass
-
-
-class Network:
-    def __init__(self, net_list):
-        self.s1 = IPSet()
-
-    def host_list(self):
-        return self.s1
-
-    def add_ip_to_set(self):
-        self.s1.add(IPRange("10.0.0.0", "10.0.0.255"))
-
-
-    def add_ip_range(self):
-        self.s1.add(IPRange("10.0.0.0", "10.0.0.255"))
-
-
-    def remove_ip_from_set(self):
-        self.s1.remove('10.0.0.2')
-        self.s1.remove('10.0.0.3')
-        self.s1.remove(IPRange("10.0.0.128", "10.10.10.10"))
+    
+    def write_to_file(self):
+        with open("file.txt" , "w+") as f:
+            f.write(ip_set)
 
 
 
-
-ip_list = IPList()
-net_list = ip_list.create_network_list()
-
+network_list = Network()
+r = network_list.check("1.1.1.1")
+print(r)
+        
