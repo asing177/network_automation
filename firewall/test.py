@@ -1,5 +1,7 @@
 from netaddr import *
 import json
+import sys
+import multiprocessing
 
 class Network:
     def __init__(self):
@@ -21,6 +23,7 @@ class Network:
         self.ip_set = ip_set
         self.net_list = net_list
         self._index = 0
+        self._lock = multiprocessing.Lock()
     
     def __iter__(self): 
         return self
@@ -43,7 +46,7 @@ class Network:
             self.ip_set.add(IPNetwork(ip_address))
         elif "-" in ip_address:
             start_ip , end_ip = ip_address.split("-")
-            self.ip_set.add(IPRange(ip_address))
+            self.ip_set.add(IPRange(start_ip,end_ip))
         else:
             self.ip_set.add(IPAddress(ip_address))
 
@@ -55,38 +58,50 @@ class Network:
             self.ip_set.remove(IPNetwork(ip_address))
         elif "-" in ip_address:
             start_ip , end_ip = ip_address.split("-")
-            self.ip_set.remove(IPRange(ip_address))
+            self.ip_set.remove(IPRange(start_ip,end_ip))
         else:
             self.ip_set.remove(IPAddress(ip_address))
+
         self.write_to_file()
     
 
     def check(self, ip_address):
         if "/" in ip_address:
             if IPNetwork(ip_address) in self.ip_set:
-                return True
+                return {"result" : f"{ip_address} is present" }
             else:
-                return False
+                return {"result" : f"{ip_address} is not present" }
         elif "-" in ip_address:
             start_ip , end_ip = ip_address.split("-")
             if IPRange(start_ip,end_ip) in self.ip_set:
-                return True
+                return {"result" : f"{ip_address} is present" }
             else:
-                return False
+                return {"result" : f"{ip_address} is not present" }
         else:
             if IPAddress(ip_address) in self.ip_set:
-                return {"result" : "f'{ip_address}'"}
+                return {"result" : f"{ip_address} is present" }
             else:
-                return False
+                return {"result" : f"{ip_address} is not present" }
+    
+    def summarize_network(self):
+        return cidr_merge(self.ip_set)
 
     
     def write_to_file(self):
-        with open("file.txt" , "w+") as f:
-            f.write(ip_set)
+        summarized_net = self.summarize_network()
+        with self._lock:
+            try:
+                with open("file.txt" , "w") as f:
+                    f.write("\n".join(str(item) for item in summarized_net))
+            except IOError as e:
+                print (f"I/O error({e.errno}): {e.strerror}")
+            except:
+                print ("Unexpected error:", sys.exc_info()[0])
+
 
 
 
 network_list = Network()
-r = network_list.check("1.1.1.1")
-print(r)
-        
+network_list.add("11.11.11.0/24")     
+network_list.remove("11.11.11.10-11.11.11.20")  
+r = network_list.check("11.11.11.21")
